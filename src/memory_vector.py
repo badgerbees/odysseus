@@ -26,7 +26,7 @@ class MemoryVectorStore:
 
     def _initialize(self):
         try:
-            from src.chroma_client import get_chroma_client
+            from src.chroma_client import get_chroma_client, ensure_embedding_collection
 
             if self._model is None:
                 from src.embeddings import get_embedding_client
@@ -36,8 +36,10 @@ class MemoryVectorStore:
                 logger.info(f"MemoryVectorStore using embeddings: {self._model.url}")
 
             client = get_chroma_client()
-            self._collection = client.get_or_create_collection(
-                name=self.COLLECTION_NAME,
+            self._collection = ensure_embedding_collection(
+                client,
+                self.COLLECTION_NAME,
+                self._model,
                 metadata={"hnsw:space": "cosine"},
             )
 
@@ -137,7 +139,7 @@ class MemoryVectorStore:
         if not self._healthy:
             return
 
-        from src.chroma_client import get_chroma_client
+        from src.chroma_client import get_chroma_client, embedding_metadata
 
         # Delete and recreate collection for a clean rebuild
         client = get_chroma_client()
@@ -147,7 +149,7 @@ class MemoryVectorStore:
             pass
         self._collection = client.get_or_create_collection(
             name=self.COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"},
+            metadata=embedding_metadata(self._model, {"hnsw:space": "cosine"}),
         )
 
         texts = []

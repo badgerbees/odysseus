@@ -55,7 +55,7 @@ class VectorRAG:
 
     def _initialize_system(self) -> bool:
         try:
-            from src.chroma_client import get_chroma_client
+            from src.chroma_client import get_chroma_client, ensure_embedding_collection
             from src.embeddings import get_embedding_client
 
             self._model = get_embedding_client()
@@ -64,8 +64,10 @@ class VectorRAG:
             logger.info(f"Embedding: {self._model.url} model={self._model.model}")
 
             client = get_chroma_client()
-            self._collection = client.get_or_create_collection(
-                name=COLLECTION_NAME,
+            self._collection = ensure_embedding_collection(
+                client,
+                COLLECTION_NAME,
+                self._model,
                 metadata={"hnsw:space": "cosine"},
             )
 
@@ -290,7 +292,7 @@ class VectorRAG:
 
     def rebuild_index(self) -> bool:
         try:
-            from src.chroma_client import get_chroma_client
+            from src.chroma_client import get_chroma_client, embedding_metadata
             client = get_chroma_client()
             try:
                 client.delete_collection(COLLECTION_NAME)
@@ -298,7 +300,7 @@ class VectorRAG:
                 pass
             self._collection = client.get_or_create_collection(
                 name=COLLECTION_NAME,
-                metadata={"hnsw:space": "cosine"},
+                metadata=embedding_metadata(self._model, {"hnsw:space": "cosine"}),
             )
             self._healthy = True
             return True

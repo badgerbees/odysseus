@@ -301,6 +301,12 @@ def setup_embedding_routes():
         import src.rag_singleton as _rs
         _rs.rag_instance = None
         _rs._last_attempt = 0
+        try:
+            import src.tool_index as _ti
+            _ti._tool_index = None
+            _ti._last_attempt = 0
+        except Exception:
+            pass
 
         # Clear the HTTP-embedding "down" latch so the new endpoint is re-probed
         # instead of staying on the FastEmbed fallback for the process lifetime.
@@ -334,6 +340,12 @@ def setup_embedding_routes():
         import src.rag_singleton as _rs
         _rs.rag_instance = None
         _rs._last_attempt = 0
+        try:
+            import src.tool_index as _ti
+            _ti._tool_index = None
+            _ti._last_attempt = 0
+        except Exception:
+            pass
         try:
             from src.embeddings import reset_http_embed_state
             reset_http_embed_state()

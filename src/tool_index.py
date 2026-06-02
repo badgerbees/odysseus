@@ -152,7 +152,7 @@ class ToolIndex:
     """ChromaDB-backed tool index for RAG-based tool selection."""
 
     def __init__(self):
-        from src.chroma_client import get_chroma_client
+        from src.chroma_client import get_chroma_client, ensure_embedding_collection
         from src.embeddings import get_embedding_client
 
         self._embedder = get_embedding_client()
@@ -160,8 +160,10 @@ class ToolIndex:
             raise RuntimeError("No embedding client available")
 
         client = get_chroma_client()
-        self._collection = client.get_or_create_collection(
-            name=COLLECTION_NAME,
+        self._collection = ensure_embedding_collection(
+            client,
+            COLLECTION_NAME,
+            self._embedder,
             metadata={"hnsw:space": "cosine"},
         )
         self._fingerprint = ""
