@@ -143,6 +143,59 @@ async def do_manage_calendar(content: str, owner: Optional[str] = None) -> Dict:
         """Parse agent event datetimes in the user's timezone when available."""
         return _parse_dt_pair(parse_due_for_user(raw))
 
+    def _has_explicit_time(raw: str) -> bool:
+        text = str(raw or "")
+        return bool(re.search(
+            r"(?i)(\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b|\b(?:noon|midnight)\b|T\d{2}:\d{2})",
+            text,
+        ))
+
+    def _storage_to_local(dt: datetime, is_utc: bool) -> datetime:
+        from datetime import timezone as _tz
+        from src.user_time import user_timezone as _user_timezone
+        if is_utc:
+            return dt.replace(tzinfo=_tz.utc).astimezone(_user_timezone())
+        return dt.replace(tzinfo=_user_timezone())
+
+    def _local_to_storage(local_dt: datetime, keep_utc_storage: bool) -> datetime:
+        from datetime import timezone as _tz
+        if keep_utc_storage:
+            return local_dt.astimezone(_tz.utc).replace(tzinfo=None)
+        return local_dt.replace(tzinfo=None)
+
+    def _align_dtstart_to_source_phrase(
+        dtstart: datetime, dtstart_is_utc: bool, source_raw: str
+    ) -> tuple[datetime, Optional[timedelta], Optional[str]]:
+        """Use the user's copied date phrase to catch bad model ISO conversions.
+
+        The model may convert "June 10" into an unrelated ISO date before the
+        tool sees it. When the call includes the original phrase, parse that
+        phrase with the same user-timezone logic and correct the local date
+        while preserving the model's chosen time if the phrase had no time.
+        """
+        if source_raw in (None, ""):
+            return dtstart, None, None
+        try:
+            source_dt, source_is_utc = _parse_event_dt(str(source_raw))
+        except ValueError:
+            return dtstart, None, None
+
+        local_start = _storage_to_local(dtstart, dtstart_is_utc)
+        local_source = _storage_to_local(source_dt, source_is_utc)
+        if local_start.date() == local_source.date():
+            return dtstart, None, None
+
+        if _has_explicit_time(str(source_raw)):
+            corrected_local = local_source
+        else:
+            corrected_local = local_start.replace(
+                year=local_source.year,
+                month=local_source.month,
+                day=local_source.day,
+            )
+        corrected = _local_to_storage(corrected_local, dtstart_is_utc)
+        return corrected, corrected - dtstart, str(source_raw)
+
     def _first_nonempty_arg(*names: str):
         for name in names:
             value = args.get(name)
@@ -328,11 +381,27 @@ async def do_manage_calendar(content: str, owner: Optional[str] = None) -> Dict:
                 dtstart, dtstart_is_utc = _parse_event_dt(dtstart_str)
             except ValueError as e:
                 return {"error": f"Could not parse dtstart {dtstart_str!r}: {e}", "exit_code": 1}
+            source_dt_raw = _first_nonempty_arg(
+                "date_text",
+                "date_phrase",
+                "datetime_text",
+                "datetime_phrase",
+                "source_date",
+                "source_datetime",
+                "requested_date",
+                "requested_datetime",
+                "when_text",
+            )
+            dtstart, source_shift, source_phrase = _align_dtstart_to_source_phrase(
+                dtstart, dtstart_is_utc, source_dt_raw
+            )
             dtend_raw = args.get("dtend") or args.get("end") or args.get("end_time")
             if dtend_raw:
                 try:
                     dtend, dtend_is_utc = _parse_event_dt(dtend_raw)
                     dtstart_is_utc = dtstart_is_utc or dtend_is_utc
+                    if source_shift is not None:
+                        dtend = dtend + source_shift
                 except ValueError as e:
                     return {"error": f"Could not parse dtend {dtend_raw!r}: {e}", "exit_code": 1}
             else:
@@ -442,13 +511,20 @@ async def do_manage_calendar(content: str, owner: Optional[str] = None) -> Dict:
                 reminder_blurb = f" with reminder {minutes_before} min before"
             else:
                 reminder_blurb = f" without reminder ({reminder_skipped_reason or 'reminder time already passed'})"
+            stored_when = (
+                ev.dtstart.strftime("%Y-%m-%d") if ev.all_day else
+                ev.dtstart.isoformat() + ("Z" if ev.is_utc else "")
+            )
+            source_blurb = f" (date normalized from {source_phrase!r})" if source_phrase else ""
             # Return a clickable anchor so the agent can surface a link
             # that opens the calendar on that day. See the markdown
             # anchor convention ([Name](#event-<uid>)).
             return {
-                "response": f"Created event [{summary}](#event-{uid}){tag_blurb} on {dtstart_str}{reminder_blurb}",
+                "response": f"Created event [{summary}](#event-{uid}){tag_blurb} on {stored_when}{source_blurb}{reminder_blurb}",
                 "uid": uid,
                 "anchor": f"[{summary}](#event-{uid})",
+                "dtstart": stored_when,
+                "date_normalized_from": source_phrase,
                 "reminder_note_id": reminder_note_id,
                 "reminder_skipped_reason": reminder_skipped_reason,
                 "exit_code": 0,

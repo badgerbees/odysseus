@@ -132,7 +132,10 @@ def current_datetime_prompt(now_utc: Optional[datetime] = None) -> str:
         "relative-date reasoning. Do not ask for an exact date just because the "
         "user used a relative date.\n"
         "When scheduling calendar events with manage_calendar, pass local ISO "
-        "datetimes resolved against this user-local date/time.\n"
+        "datetimes resolved against this user-local date/time, or pass the "
+        "user's natural-language date phrase directly. Preserve named "
+        "month/day dates exactly: 'June 10' means month 06, day 10, not an "
+        "example date from the prompt.\n"
         "When scheduling a task with manage_tasks, scheduled_time is in UTC: "
         "convert the user's stated local time using the UTC offset above.\n\n"
     )

@@ -549,7 +549,7 @@ FUNCTION_TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "manage_calendar",
-            "description": "Manage calendar events: list events in a date range, create, update, delete. Each event can carry a tag/category (event_type) and importance level. Resolve relative dates like today/tomorrow against the 'Current date and time' system context, then pass ISO 8601 datetimes in the user's local wall time; for all-day events set all_day=true and pass YYYY-MM-DD. For event reminders/alarms, pass reminder_minutes; the tool creates the Odysseus note reminder, so do not also call manage_notes for the same reminder. Do not set rrule for single-occurrence requests such as 'next Wednesday only'; use rrule only when the user explicitly wants recurrence.",
+            "description": "Manage calendar events: list events in a date range, create, update, delete. Each event can carry a tag/category (event_type) and importance level. Resolve relative dates like today/tomorrow against the 'Current date and time' system context, then pass ISO 8601 datetimes in the user's local wall time. For create_event, dtstart may be natural language or ISO; when the user gives a named date like 'June 10', copy that original phrase into date_text and preserve the month/day exactly if you convert to ISO ('June 10' -> YYYY-06-10, never January). For all-day events set all_day=true and pass YYYY-MM-DD. For event reminders/alarms, pass reminder_minutes; the tool creates the Odysseus note reminder, so do not also call manage_notes for the same reminder. Do not set rrule for single-occurrence requests such as 'next Wednesday only'; use rrule only when the user explicitly wants recurrence.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -557,7 +557,8 @@ FUNCTION_TOOL_SCHEMAS = [
                                "enum": ["list_events", "create_event", "update_event", "delete_event", "list_calendars"],
                                "description": "Action to perform"},
                     "summary": {"type": "string", "description": "Event title (for create/update)"},
-                    "dtstart": {"type": "string", "description": "Start ISO datetime, or YYYY-MM-DD if all_day"},
+                    "dtstart": {"type": "string", "description": "Start datetime. Natural language is allowed and often safer (e.g. 'June 10 3pm', 'tomorrow at 1pm'), or use ISO/local wall time. If converting a named date to ISO, preserve month/day exactly: 'June 10' must become YYYY-06-10, not January."},
+                    "date_text": {"type": "string", "description": "For create_event, copy the user's original date phrase exactly when present, e.g. 'June 10' or 'next Friday'. Used to validate/correct dtstart if the model's ISO conversion is wrong."},
                     "dtend": {"type": "string", "description": "End ISO datetime; defaults to +1h (or +1 day for all_day)"},
                     "all_day": {"type": "boolean", "description": "Whether this is an all-day event"},
                     "description": {"type": "string", "description": "Event description / notes"},

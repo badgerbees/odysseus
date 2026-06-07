@@ -111,3 +111,33 @@ async def test_list_events_query_without_range_does_not_default_to_two_weeks():
     }), owner="list-" + uuid.uuid4().hex[:6])
     assert listed.get("exit_code") == 1, listed
     assert "explicit start/end" in listed["error"]
+
+
+async def test_create_event_corrects_bad_iso_from_original_date_phrase(tokyo_offset):
+    from src.tool_implementations import do_manage_calendar
+
+    owner = "date-" + uuid.uuid4().hex[:6]
+    created = await do_manage_calendar(json.dumps({
+        "action": "create_event",
+        "summary": "Meeting",
+        # Regression shape: the model converted "June 10" to an unrelated ISO
+        # date before calling the tool. date_text lets the tool catch it.
+        "dtstart": "2026-01-15T09:00:00",
+        "dtend": "2026-01-15T10:00:00",
+        "date_text": "June 10",
+    }), owner=owner)
+    assert created.get("exit_code", 0) == 0, created
+    assert created["date_normalized_from"] == "June 10"
+    assert "2026-06-10" in created["dtstart"]
+    uid = created["uid"]
+
+    db = _TS()
+    try:
+        ev = db.query(CalendarEvent).filter(CalendarEvent.uid == uid).first()
+        assert ev is not None
+        # 09:00 Tokyo on June 10 is stored as 00:00 UTC.
+        assert ev.dtstart.isoformat() == "2026-06-10T00:00:00"
+        assert ev.dtend.isoformat() == "2026-06-10T01:00:00"
+        assert bool(ev.is_utc) is True
+    finally:
+        db.close()
