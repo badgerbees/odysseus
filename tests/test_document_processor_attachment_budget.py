@@ -55,7 +55,9 @@ def test_multifile_inline_attachment_budget_keeps_later_files_visible(tmp_path, 
     assert "Attachment omitted from inline context: b.txt" in content
     assert "Attachment omitted from inline context: c.txt" in content
     assert "Ask to inspect this file specifically" in content
-    assert len(content) < 2200
+    assert "--- BEGIN ATTACHED FILE 1/3: a.txt ---" in content
+    assert "--- BEGIN ATTACHED FILE 3/3: c.txt ---" in content
+    assert len(content) < 2600
 
 
 def test_inline_attachment_budget_does_not_truncate_small_batches(tmp_path, monkeypatch):
@@ -78,3 +80,103 @@ def test_inline_attachment_budget_does_not_truncate_small_batches(tmp_path, monk
     assert "=== File: a.txt ===" in content
     assert "=== File: b.txt ===" in content
     assert "Attachment content truncated" not in content
+    assert "--- BEGIN ATTACHED FILE 1/2: a.txt ---" in content
+    assert "--- END ATTACHED FILE 2/2: b.txt ---" in content
+
+
+def test_text_attachment_uses_original_filename_not_upload_id(tmp_path):
+    import src.document_processor as dp
+
+    stored_name = "cd1d913f7ded4d76a239bb74723e4a00.md"
+    path = tmp_path / stored_name
+    path.write_text("# Notes\n\nOriginal file body", encoding="utf-8")
+    uploads = {
+        stored_name: {
+            "path": str(path),
+            "name": stored_name,
+            "original_name": "project-notes.md",
+            "mime": "text/markdown",
+            "size": path.stat().st_size,
+        }
+    }
+
+    content = dp.build_user_content(
+        "Name this file.",
+        [stored_name],
+        str(tmp_path),
+        _UploadHandler(uploads),
+        owner="tester",
+    )
+
+    assert "--- BEGIN ATTACHED FILE 1/1: project-notes.md ---" in content
+    assert "=== File: project-notes.md ===" in content
+    assert stored_name not in content
+
+
+def test_attachment_display_name_strips_path_and_control_characters(tmp_path):
+    import src.document_processor as dp
+
+    stored_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.md"
+    path = tmp_path / stored_name
+    path.write_text("body", encoding="utf-8")
+    uploads = {
+        "upload-id": {
+            "path": str(path),
+            "name": stored_name,
+            "original_name": "..\\nested\\project\nnotes.md",
+            "mime": "text/markdown",
+            "size": path.stat().st_size,
+        }
+    }
+
+    content = dp.build_user_content(
+        "Name this file.",
+        ["upload-id"],
+        str(tmp_path),
+        _UploadHandler(uploads),
+        owner="tester",
+    )
+
+    assert "--- BEGIN ATTACHED FILE 1/1: project notes.md ---" in content
+    assert "=== File: project notes.md ===" in content
+    assert "nested" not in content
+
+
+def test_ten_text_attachments_are_individually_labeled(tmp_path, monkeypatch):
+    import src.document_processor as dp
+
+    monkeypatch.setattr(dp, "MAX_INLINE_ATTACHMENT_CHARS", 20000)
+    uploads = {}
+    ids = []
+    stored_names = []
+    for idx in range(10):
+        stored_name = f"{idx + 1:032x}.txt"
+        original_name = f"notes-{idx + 1}.txt"
+        path = tmp_path / stored_name
+        path.write_text(f"body {idx + 1}", encoding="utf-8")
+        uploads[stored_name] = {
+            "path": str(path),
+            "name": stored_name,
+            "original_name": original_name,
+            "mime": "text/plain",
+            "size": path.stat().st_size,
+        }
+        ids.append(stored_name)
+        stored_names.append(stored_name)
+
+    content = dp.build_user_content(
+        "Name each attached file.",
+        ids,
+        str(tmp_path),
+        _UploadHandler(uploads),
+        owner="tester",
+    )
+
+    for idx in range(10):
+        original_name = f"notes-{idx + 1}.txt"
+        assert f"--- BEGIN ATTACHED FILE {idx + 1}/10: {original_name} ---" in content
+        assert f"--- END ATTACHED FILE {idx + 1}/10: {original_name} ---" in content
+        assert f"=== File: {original_name} ===" in content
+        assert f"body {idx + 1}" in content
+    for stored_name in stored_names:
+        assert stored_name not in content

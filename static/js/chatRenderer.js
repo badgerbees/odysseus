@@ -2389,6 +2389,7 @@ export function addMessage(role, content, modelName, metadata) {
     if (role === 'user' && attachments?.length) {
       // Strip === File: ... === blocks, [PDF content]: blocks, and [Image attached: ...] lines
       text = text
+        .replace(/\n*--- BEGIN ATTACHED FILE \d+\/\d+: [\s\S]*?--- END ATTACHED FILE \d+\/\d+: [^\n]+ ---/g, '')
         .replace(/\n*=== File: .+? ===\n\[Type: .+?\]\n+```[\s\S]*?```/g, '')
         .replace(/\n*=== File: .+? ===\n\[Type: .+?\]\n+[\s\S]*?(?=\n*=== File:|$)/g, '')
         .replace(/\n*\[PDF content\]:[\s\S]*?(?=\n*\[PDF content\]|\n*=== File:|$)/g, '')

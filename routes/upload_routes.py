@@ -152,6 +152,7 @@ def setup_upload_routes(upload_handler):
                 item = {
                     "id": meta["id"],
                     "name": meta["name"],
+                    "original_name": meta.get("original_name") or meta["name"],
                     "mime": meta["mime"],
                     "size": meta["size"],
                     "hash": meta["hash"],
@@ -207,7 +208,7 @@ def setup_upload_routes(upload_handler):
         db = upload_handler._load_upload_index()
         info = next((fi for fi in db.values() if fi.get("id") == file_id), None)
         if info:
-            original_name = info.get("name", file_id)
+            original_name = info.get("original_name") or info.get("name") or file_id
         auth_mgr = getattr(request.app.state, "auth_manager", None)
         auth_configured = bool(auth_mgr and auth_mgr.is_configured)
         current_user = effective_user(request)

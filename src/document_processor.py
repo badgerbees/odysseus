@@ -6,6 +6,7 @@ import logging
 import mimetypes
 import base64
 import tempfile
+import re
 from typing import List, Dict, Any
 
 from src.llm_core import llm_call
@@ -24,7 +25,15 @@ def _is_text_file(path: str) -> bool:
     )
 
 
-def _process_text_file(path: str) -> str:
+def _display_basename(value: str | None, fallback: str = "attachment") -> str:
+    """Return a prompt-safe display basename for an uploaded file."""
+    raw = str(value or "").strip().replace("\\", "/")
+    name = raw.rsplit("/", 1)[-1]
+    name = re.sub(r"[\x00-\x1f\x7f]+", " ", name).strip()
+    return name or fallback
+
+
+def _process_text_file(path: str, display_name: str | None = None) -> str:
     """Process text file with enhanced formatting and metadata."""
     language_map = {
         ".py": "python", ".js": "javascript", ".html": "html", ".css": "css",
@@ -36,7 +45,7 @@ def _process_text_file(path: str) -> str:
         ".rb": "ruby", ".ts": "typescript", ".jsx": "javascript", ".tsx": "typescript",
     }
 
-    filename = os.path.basename(path)
+    filename = _display_basename(display_name, os.path.basename(path))
     _, ext = os.path.splitext(path.lower())
     language = language_map.get(ext, "text")
     max_len = 30000 if ext != ".log" else 10000
@@ -199,6 +208,25 @@ def _fit_inline_attachment_text(
     return text[:remaining] + marker, 0
 
 
+def _attachment_boundary(
+    index: int,
+    total: int,
+    display_name: str,
+    mime: str,
+    size: Any = None,
+) -> tuple[str, str]:
+    safe_name = _display_basename(display_name, "attachment")
+    details = [f"MIME: {mime or 'unknown'}"]
+    if isinstance(size, int) and size >= 0:
+        details.append(f"Size: {size:,} bytes")
+    header = (
+        f"\n\n--- BEGIN ATTACHED FILE {index}/{total}: {safe_name} ---\n"
+        f"[{'; '.join(details)}]"
+    )
+    footer = f"\n--- END ATTACHED FILE {index}/{total}: {safe_name} ---"
+    return header, footer
+
+
 def _process_office_document(
     path: str,
     display_name: str,
@@ -225,7 +253,7 @@ def _process_office_document(
 
     markdown = convert_to_markdown(path)
     if markdown and markdown.strip():
-        title = os.path.splitext(os.path.basename(path))[0]
+        title = os.path.splitext(_display_basename(display_name, os.path.basename(path)))[0]
         body, marker = _truncate_inline(markdown)
 
         # Persist the full extracted text as a Document. The agent's existing
@@ -413,7 +441,8 @@ def build_user_content(
     content = [{"type": "text", "text": text}]
     inline_attachment_remaining = MAX_INLINE_ATTACHMENT_CHARS
 
-    for fid in attachment_ids or []:
+    total_attachments = len(attachment_ids or [])
+    for attachment_index, fid in enumerate(attachment_ids or [], start=1):
         upload_info = (resolved_uploads or {}).get(fid)
         if upload_info is None and hasattr(upload_handler, "resolve_upload"):
             upload_info = upload_handler.resolve_upload(fid, owner=owner)
@@ -434,10 +463,28 @@ def build_user_content(
 
         _, ext = os.path.splitext(path.lower())
         mime = upload_info.get("mime") or mimetypes.guess_type(path)[0] or "application/octet-stream"
-        display_name = upload_info.get("name") or upload_info.get("original_name") or path
+        display_name = (
+            upload_info.get("original_name")
+            or upload_info.get("name")
+            or os.path.basename(path)
+            or fid
+        )
+        display_name = _display_basename(display_name, fid)
+        boundary_open, boundary_close = _attachment_boundary(
+            attachment_index,
+            total_attachments,
+            display_name,
+            mime,
+            upload_info.get("size"),
+        )
 
         if upload_handler.is_image_file(display_name, mime):
             try:
+                if content and content[0]["type"] == "text":
+                    content[0]["text"] += (
+                        f"{boundary_open}\n[Image attached as media for this file.]"
+                        f"{boundary_close}"
+                    )
                 with open(path, "rb") as image_file:
                     encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
                 image_format = ext[1:]
@@ -454,6 +501,11 @@ def build_user_content(
 
         elif upload_handler.is_audio_file(display_name, mime):
             try:
+                if content and content[0]["type"] == "text":
+                    content[0]["text"] += (
+                        f"{boundary_open}\n[Audio attached as media for this file.]"
+                        f"{boundary_close}"
+                    )
                 with open(path, "rb") as audio_file:
                     encoded_string = base64.b64encode(audio_file.read()).decode("utf-8")
                 audio_format = ext[1:]
@@ -479,7 +531,7 @@ def build_user_content(
                             create_form_markdown_document,
                             create_plain_pdf_document,
                         )
-                        title = os.path.splitext(os.path.basename(display_name))[0]
+                        title = os.path.splitext(display_name)[0]
                         # Pull the PDF prose once — used as either intro_text
                         # (form path) or the doc body (plain path).
                         try:
@@ -568,7 +620,7 @@ def build_user_content(
                 if extracted_text is None:
                     extracted_text = _process_pdf(path, owner=owner)
             elif mime.startswith("text/") or _is_text_file(path):
-                extracted_text = _process_text_file(path)
+                extracted_text = _process_text_file(path, display_name)
             else:
                 extracted_text = _process_office_document(
                     path,
@@ -583,15 +635,22 @@ def build_user_content(
                 inline_attachment_remaining,
                 display_name,
             )
+            extracted_text = f"{boundary_open}{extracted_text}{boundary_close}"
             if content and content[0]["type"] == "text":
                 content[0]["text"] += extracted_text
             else:
                 content.insert(0, {"type": "text", "text": extracted_text.lstrip()})
         else:
             if content and content[0]["type"] == "text":
-                content[0]["text"] += "\n\n[Attached non-text file]"
+                content[0]["text"] += (
+                    f"{boundary_open}\n[Attached non-text file]"
+                    f"{boundary_close}"
+                )
             else:
-                content.insert(0, {"type": "text", "text": "[Attached non-text file]"})
+                content.insert(0, {"type": "text", "text": (
+                    f"{boundary_open.lstrip()}\n[Attached non-text file]"
+                    f"{boundary_close}"
+                )})
 
     has_media = any(item.get("type") in ["image_url", "audio"] for item in content if isinstance(item, dict))
     if not has_media and content:

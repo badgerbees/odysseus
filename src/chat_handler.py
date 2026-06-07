@@ -160,7 +160,7 @@ class ChatHandler:
                 if fi:
                     attachment_meta.append({
                         "id": fi["id"],
-                        "name": fi.get("name") or fi.get("original_name") or fi["id"],
+                        "name": fi.get("original_name") or fi.get("name") or fi["id"],
                         "mime": fi.get("mime", ""),
                         "size": fi.get("size", 0),
                         "width": fi.get("width"),
