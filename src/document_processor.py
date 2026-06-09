@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 MAX_INLINE_ATTACHMENT_CHARS = 24000
 MIN_INLINE_ATTACHMENT_SLICE = 500
+MAX_DISPLAY_BASENAME_CHARS = 128
 
 
 def _is_text_file(path: str) -> bool:
@@ -29,7 +30,13 @@ def _display_basename(value: str | None, fallback: str = "attachment") -> str:
     """Return a prompt-safe display basename for an uploaded file."""
     raw = str(value or "").strip().replace("\\", "/")
     name = raw.rsplit("/", 1)[-1]
-    name = re.sub(r"[\x00-\x1f\x7f]+", " ", name).strip()
+    name = re.sub(r"[\x00-\x1f\x7f]+", " ", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    name = re.sub(r"(?i)BEGIN ATTACHED FILE", "BEGIN_ATTACHED_FILE", name)
+    name = re.sub(r"(?i)END ATTACHED FILE", "END_ATTACHED_FILE", name)
+    name = re.sub(r"-{2,}", "-", name)
+    if len(name) > MAX_DISPLAY_BASENAME_CHARS:
+        name = name[:MAX_DISPLAY_BASENAME_CHARS].rstrip()
     return name or fallback
 
 
