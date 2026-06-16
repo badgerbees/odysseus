@@ -141,3 +141,77 @@ async def test_create_event_corrects_bad_iso_from_original_date_phrase(tokyo_off
         assert bool(ev.is_utc) is True
     finally:
         db.close()
+
+
+async def test_create_event_corrects_time_bearing_date_phrase(tokyo_offset):
+    from src.tool_implementations import do_manage_calendar
+
+    owner = "tz-" + uuid.uuid4().hex[:6]
+    created = await do_manage_calendar(json.dumps({
+        "action": "create_event",
+        "summary": "Meeting",
+        "dtstart": "2026-01-15T09:00:00",
+        "dtend": "2026-01-15T10:00:00",
+        "date_text": "June 10 at 2pm",
+    }), owner=owner)
+    assert created.get("exit_code", 0) == 0, created
+    assert created["date_normalized_from"] == "June 10 at 2pm"
+    
+    db = _TS()
+    try:
+        ev = db.query(CalendarEvent).filter(CalendarEvent.uid == created["uid"]).first()
+        # 2pm Tokyo on June 10 is 05:00 UTC.
+        assert ev.dtstart.isoformat() == "2026-06-10T05:00:00"
+        assert ev.dtend.isoformat() == "2026-06-10T06:00:00"
+        assert bool(ev.is_utc) is True
+    finally:
+        db.close()
+
+
+async def test_create_event_corrects_all_day_event(tokyo_offset):
+    from src.tool_implementations import do_manage_calendar
+
+    owner = "tz-" + uuid.uuid4().hex[:6]
+    created = await do_manage_calendar(json.dumps({
+        "action": "create_event",
+        "summary": "Holiday",
+        "dtstart": "2026-01-15",
+        "all_day": True,
+        "date_text": "June 10",
+    }), owner=owner)
+    assert created.get("exit_code", 0) == 0, created
+    
+    db = _TS()
+    try:
+        ev = db.query(CalendarEvent).filter(CalendarEvent.uid == created["uid"]).first()
+        assert ev.dtstart.isoformat() == "2026-06-10T00:00:00"
+        assert ev.dtend.isoformat() == "2026-06-11T00:00:00"
+        assert bool(ev.all_day) is True
+        assert bool(ev.is_utc) is False
+    finally:
+        db.close()
+
+
+async def test_create_event_corrects_non_utc_storage():
+    from src.tool_implementations import do_manage_calendar
+
+    owner = "tz-" + uuid.uuid4().hex[:6]
+    # No tokyo_offset fixture here -> naive/local time storage (is_utc=False)
+    created = await do_manage_calendar(json.dumps({
+        "action": "create_event",
+        "summary": "Meeting",
+        "dtstart": "2026-01-15T09:00:00",
+        "dtend": "2026-01-15T10:00:00",
+        "date_text": "June 10",
+    }), owner=owner)
+    assert created.get("exit_code", 0) == 0, created
+    
+    db = _TS()
+    try:
+        ev = db.query(CalendarEvent).filter(CalendarEvent.uid == created["uid"]).first()
+        assert ev.dtstart.isoformat() == "2026-06-10T09:00:00"
+        assert ev.dtend.isoformat() == "2026-06-10T10:00:00"
+        assert bool(ev.is_utc) is False
+    finally:
+        db.close()
+
