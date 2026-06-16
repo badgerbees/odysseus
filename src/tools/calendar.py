@@ -379,6 +379,9 @@ async def do_manage_calendar(content: str, owner: Optional[str] = None) -> Dict:
             all_day = bool(args.get("all_day", False))
             try:
                 dtstart, dtstart_is_utc = _parse_event_dt(dtstart_str)
+                if all_day:
+                    dtstart = _storage_to_local(dtstart, dtstart_is_utc).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+                    dtstart_is_utc = False
             except ValueError as e:
                 return {"error": f"Could not parse dtstart {dtstart_str!r}: {e}", "exit_code": 1}
             source_dt_raw = _first_nonempty_arg(
