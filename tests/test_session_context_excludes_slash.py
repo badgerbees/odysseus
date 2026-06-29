@@ -12,10 +12,10 @@ from core.models import Session, ChatMessage
 
 def _session_with_slash():
     s = Session(id="s1", name="t", endpoint_url="http://x/v1", model="m")
-    s.add_message(ChatMessage("user", "hi, give me a recipe"))
-    s.add_message(ChatMessage("user", "/setup copilot", metadata={"source": "slash"}))
-    s.add_message(ChatMessage("assistant", "Starting GitHub Copilot sign-in...", metadata={"source": "slash"}))
-    s.add_message(ChatMessage("assistant", "Here is a recipe", metadata={"model": "m"}))
+    s.history.append(ChatMessage("user", "hi, give me a recipe"))
+    s.history.append(ChatMessage("user", "/setup copilot", metadata={"source": "slash"}))
+    s.history.append(ChatMessage("assistant", "Starting GitHub Copilot sign-in...", metadata={"source": "slash"}))
+    s.history.append(ChatMessage("assistant", "Here is a recipe", metadata={"model": "m"}))
     return s
 
 
@@ -39,6 +39,6 @@ def test_history_still_keeps_slash_messages_for_display():
 
 def test_no_metadata_messages_are_kept():
     s = Session(id="s2", name="t", endpoint_url="http://x/v1", model="m")
-    s.add_message(ChatMessage("user", "plain"))
-    s.add_message(ChatMessage("assistant", "reply"))
+    s.history.append(ChatMessage("user", "plain"))
+    s.history.append(ChatMessage("assistant", "reply"))
     assert [m["content"] for m in s.get_context_messages()] == ["plain", "reply"]

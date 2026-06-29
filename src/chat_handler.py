@@ -337,8 +337,9 @@ class ChatHandler:
                 mem.append(new_entry)
                 self.memory_manager.save(mem)
 
-            session.add_message(ChatMessage("user", message))
-            session.add_message(
+            self.session_manager.add_message(session.id, ChatMessage("user", message))
+            self.session_manager.add_message(
+                session.id,
                 ChatMessage("assistant", f"Saved to memory: {memory_text}")
             )
 

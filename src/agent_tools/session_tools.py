@@ -226,8 +226,8 @@ async def send_to_session(content: str, session_id: Optional[str] = None, owner:
         )
 
         # Save both messages to session
-        sess.add_message(ChatMessage("user", message))
-        sess.add_message(ChatMessage("assistant", response))
+        _session_manager.add_message(sess.id, ChatMessage("user", message))
+        _session_manager.add_message(sess.id, ChatMessage("assistant", response))
 
         # Truncate for tool output
         if len(response) > 10000:
@@ -446,7 +446,7 @@ async def manage_session(content: str, session_id: Optional[str] = None, owner: 
             from core.models import ChatMessage as InMemoryMsg
             new_sess = _session_manager.get_session(new_sid)
             for msg in history:
-                new_sess.add_message(InMemoryMsg(msg["role"], msg["content"]))
+                _session_manager.add_message(new_sess.id, InMemoryMsg(msg["role"], msg["content"]))
             try:
                 from src.event_bus import fire_event
                 fire_event("session_created", owner)

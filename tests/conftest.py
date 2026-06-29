@@ -68,8 +68,10 @@ def pytest_configure(config):
     unknown-mark warnings still surface genuine typos outside the taxonomy. This
     only registers marker names; it imports no production module.
     """
+    import sys
     import pathlib
-    from tests._taxonomy import discover_markers
+    sys.path.insert(0, str(pathlib.Path(__file__).parent))
+    from _taxonomy import discover_markers
 
     tests_dir = pathlib.Path(__file__).parent
     paths = list(tests_dir.rglob("test_*.py")) + list(tests_dir.rglob("*_test.py"))
@@ -86,7 +88,7 @@ def pytest_collection_modifyitems(config, items):
     production module. See ``tests/_taxonomy.py`` for the classification rules.
     """
     import pytest
-    from tests._taxonomy import markers_for_path
+    from _taxonomy import markers_for_path
 
     for item in items:
         path = getattr(item, "path", None) or item.fspath

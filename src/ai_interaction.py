@@ -45,8 +45,7 @@ def set_session_manager(mgr):
     """Set the global session manager. Syncs local cache + core singleton."""
     global _session_manager
     _session_manager = mgr
-    from core.models import set_session_manager_instance
-    set_session_manager_instance(mgr)
+
 
 
 def get_session_manager():

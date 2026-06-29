@@ -433,7 +433,7 @@ def add_user_message(sess, chat_handler, preprocessed: PreprocessedMessage, inco
     In incognito mode, still add to in-memory history (for conversation context)
     but skip session name update (which would persist)."""
     user_meta = {"attachments": preprocessed.attachment_meta} if preprocessed.attachment_meta else None
-    sess.add_message(ChatMessage("user", preprocessed.user_content, metadata=user_meta))
+    chat_handler.session_manager.add_message(sess.id, ChatMessage("user", preprocessed.user_content, metadata=user_meta))
     if not incognito:
         chat_handler.update_session_name_if_needed(sess, preprocessed.text_for_context)
 
@@ -1063,7 +1063,7 @@ def save_assistant_response(
         _content = _think_info["reply"]
     else:
         _content = full_response
-    sess.add_message(ChatMessage("assistant", _content, metadata=md))
+    session_manager.add_message(sess.id, ChatMessage("assistant", _content, metadata=md))
 
     if not incognito:
         from core.database import update_session_last_accessed

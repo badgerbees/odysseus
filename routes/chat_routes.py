@@ -512,7 +512,7 @@ def setup_chat_routes(
             session_id=session,
         )
         _clean_reply, _clean_md = clean_thinking_for_save(reply, {"model": sess.model})
-        sess.add_message(ChatMessage("assistant", _clean_reply, metadata=_clean_md))
+        session_manager.add_message(sess.id, ChatMessage("assistant", _clean_reply, metadata=_clean_md))
 
         from core.database import update_session_last_accessed
         update_session_last_accessed(session)
@@ -1090,7 +1090,7 @@ def setup_chat_routes(
                             if _findings:
                                 _md["research_findings"] = _findings
                             _clean_res, _md = clean_thinking_for_save(_result, _md)
-                            _s.add_message(ChatMessage("assistant", _clean_res, metadata=_md))
+                            session_manager.add_message(_s.id, ChatMessage("assistant", _clean_res, metadata=_md))
                             session_manager.save_sessions()
                             logger.info(f"Research result persisted to DB for session {_sid}")
                         except Exception as _e:
@@ -1228,7 +1228,7 @@ def setup_chat_routes(
                     for _ek in ("image_url", "image_id", "image_prompt", "image_model", "image_size", "image_quality"):
                         if _img_result.get(_ek):
                             _ev[_ek] = _img_result[_ek]
-                    sess.add_message(ChatMessage("assistant", full_response, metadata={"tool_events": [_ev], "model": sess.model}))
+                    session_manager.add_message(sess.id, ChatMessage("assistant", full_response, metadata={"tool_events": [_ev], "model": sess.model}))
                     session_manager.save_sessions()
                 yield f'data: {json.dumps({"type": "metrics", "data": {"total_time": 0}})}\n\n'
                 yield "data: [DONE]\n\n"
@@ -1370,7 +1370,7 @@ def setup_chat_routes(
                                 "requested_model": _requested_model,
                             },
                         )
-                        sess.add_message(ChatMessage("assistant", _stopped_content, metadata=_stopped_md))
+                        session_manager.add_message(sess.id, ChatMessage("assistant", _stopped_content, metadata=_stopped_md))
                         if not incognito:
                             session_manager.save_sessions()
                     raise
@@ -1537,7 +1537,7 @@ def setup_chat_routes(
                                     "requested_model": _requested_model,
                                 },
                             )
-                            sess.add_message(ChatMessage("assistant", _stopped_content2, metadata=_stopped_md2))
+                            session_manager.add_message(sess.id, ChatMessage("assistant", _stopped_content2, metadata=_stopped_md2))
                             if not incognito:
                                 session_manager.save_sessions()
                     except Exception:
@@ -1629,7 +1629,7 @@ def setup_chat_routes(
         try:
             sess = session_manager.get_session(session_id)
             msg = untrusted_context_message("injected research context", f"Research Context: {context}")
-            sess.add_message(ChatMessage(msg["role"], msg["content"], metadata=msg.get("metadata")))
+            session_manager.add_message(sess.id, ChatMessage(msg["role"], msg["content"], metadata=msg.get("metadata")))
             session_manager.save_sessions()
             return {"status": "context_injected"}
         except KeyError:

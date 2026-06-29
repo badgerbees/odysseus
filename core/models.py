@@ -8,28 +8,6 @@ These are simple datacontainers. All persistence is handled by SessionManager.
 from dataclasses import dataclass
 from typing import Dict, List, Any, Optional, TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from .session_manager import SessionManager
-
-# Module-level session manager singleton (single source of truth)
-_SESSION_MANAGER_INSTANCE: Optional["SessionManager"] = None
-
-
-def set_session_manager_instance(manager: "SessionManager"):
-    """Set the global SessionManager singleton."""
-    global _SESSION_MANAGER_INSTANCE
-    _SESSION_MANAGER_INSTANCE = manager
-
-
-def get_session_manager_instance() -> Optional["SessionManager"]:
-    """Get the global SessionManager singleton."""
-    return _SESSION_MANAGER_INSTANCE
-
-
-# Keep legacy name for backward compatibility
-set_session_manager = set_session_manager_instance
-get_session_manager = get_session_manager_instance
-
 
 @dataclass
 class ChatMessage:
@@ -96,15 +74,10 @@ class Session:
         Add a message to this session.
 
         Appends to the authoritative history list and increments
-        message_count. Delegates to SessionManager for persistence
-        if available.
+        message_count.
         """
         self.history.append(message)
         self.message_count = len(self.history)
-
-        # Delegate to session manager for persistence
-        if _SESSION_MANAGER_INSTANCE:
-            _SESSION_MANAGER_INSTANCE._persist_message(self.id, message)
 
     def get_context_messages(self) -> List[Dict[str, Any]]:
         """Get messages in format for LLM API.

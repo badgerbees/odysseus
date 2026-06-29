@@ -13,6 +13,7 @@ import pytest
 
 from core.models import Session, ChatMessage
 from core.session_manager import SessionManager
+SessionManager._persist_message = lambda self, session_id, message: None
 
 
 @pytest.mark.asyncio
@@ -29,7 +30,7 @@ async def test_concurrent_sessions_have_independent_history():
     async def add_to_session(sid, msgs):
         sess = sm.sessions[sid]
         for role, content in msgs:
-            sess.add_message(ChatMessage(role, content))
+            sm.add_message(sess.id, ChatMessage(role, content))
 
     # Simulate concurrent adds
     await asyncio.gather(
@@ -59,7 +60,7 @@ async def test_concurrent_add_message_does_not_cross_contaminate():
     async def rapid_add(sid, count):
         sess = sm.sessions[sid]
         for i in range(count):
-            sess.add_message(ChatMessage("user", f"msg_{i}_from_{sid}"))
+            sm.add_message(sess.id, ChatMessage("user", f"msg_{i}_from_{sid}"))
 
     await asyncio.gather(
         rapid_add("a", 5),
@@ -89,7 +90,7 @@ async def test_concurrent_read_write_isolation():
     sm.sessions["writer"] = s2
 
     # Pre-populate reader
-    s1.add_message(ChatMessage("user", "original"))
+    sm.add_message(s1.id, ChatMessage("user", "original"))
 
     async def read_and_check():
         for _ in range(20):
@@ -101,7 +102,7 @@ async def test_concurrent_read_write_isolation():
 
     async def write_to_writer():
         for i in range(20):
-            sm.sessions["writer"].add_message(ChatMessage("user", f"writer_data_{i}"))
+            sm.add_message(sm.sessions["writer"].id, ChatMessage("user", f"writer_data_{i}"))
 
     await asyncio.gather(read_and_check(), write_to_writer())
 

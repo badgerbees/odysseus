@@ -30,12 +30,15 @@ def sm():
         self.sessions = {}
 
     SessionManager.__init__ = patched_init
+    orig_persist = SessionManager._persist_message
+    SessionManager._persist_message = lambda self, session_id, msg: None
 
     manager = SessionManager()
 
     yield manager
 
     SessionManager.__init__ = orig_session_local
+    SessionManager._persist_message = orig_persist
 
 
 class TestSessionIsolation:
@@ -49,8 +52,8 @@ class TestSessionIsolation:
         sm.sessions["s1"] = s1
         sm.sessions["s2"] = s2
 
-        s1.add_message(ChatMessage("user", "hello from A"))
-        s2.add_message(ChatMessage("user", "hello from B"))
+        sm.add_message(s1.id, ChatMessage("user", "hello from A"))
+        sm.add_message(s2.id, ChatMessage("user", "hello from B"))
 
         assert len(s1.history) == 1, f"Session A has {len(s1.history)} messages"
         assert len(s2.history) == 1, f"Session B has {len(s2.history)} messages"
@@ -64,8 +67,8 @@ class TestSessionIsolation:
         sm.sessions["s1"] = s1
         sm.sessions["s2"] = s2
 
-        s1.add_message(ChatMessage("user", "msg1"))
-        s1.add_message(ChatMessage("assistant", "resp1"))
+        sm.add_message(s1.id, ChatMessage("user", "msg1"))
+        sm.add_message(s1.id, ChatMessage("assistant", "resp1"))
 
         assert len(s2.history) == 0, (
             f"Session B has {len(s2.history)} messages leaked from Session A"
@@ -75,10 +78,10 @@ class TestSessionIsolation:
         """Pre-existing references to .history must see new messages (it's the same list)."""
         s = Session(id="s1", name="Test", endpoint_url="http://ep", model="model")
         sm.sessions["s1"] = s
-        s.add_message(ChatMessage("user", "hi"))
+        sm.add_message(s.id, ChatMessage("user", "hi"))
 
         old_history_ref = s.history
-        s.add_message(ChatMessage("user", "second message"))
+        sm.add_message(s.id, ChatMessage("user", "second message"))
 
         # .history is the authoritative mutable list — old ref sees the append
         assert len(old_history_ref) == 2, (
@@ -118,7 +121,7 @@ class TestSessionIsolation:
         sm.sessions["empty"] = s_empty
         sm.sessions["active"] = s_active
 
-        s_active.add_message(ChatMessage("user", "first"))
+        sm.add_message(s_active.id, ChatMessage("user", "first"))
 
         assert len(s_empty.history) == 0, (
             f"Empty session has {len(s_empty.history)} messages from active session"
@@ -130,9 +133,9 @@ class TestSessionIsolation:
         sm.sessions["s1"] = s
 
         assert s.message_count == 0
-        s.add_message(ChatMessage("user", "first"))
+        sm.add_message(s.id, ChatMessage("user", "first"))
         assert s.message_count == 1
-        s.add_message(ChatMessage("assistant", "reply"))
+        sm.add_message(s.id, ChatMessage("assistant", "reply"))
         assert s.message_count == 2
 
     def test_history_order_preserved(self, sm):
@@ -146,7 +149,7 @@ class TestSessionIsolation:
             ChatMessage("assistant", "a2"),
         ]
         for m in msgs:
-            s.add_message(m)
+            sm.add_message(s.id, m)
         for i, expected in enumerate(msgs):
             assert s.history[i].role == expected.role
             assert s.history[i].content == expected.content
@@ -160,9 +163,9 @@ class TestSessionIsolation:
         sm.sessions["s2"] = s2
         sm.sessions["s3"] = s3
 
-        s1.add_message(ChatMessage("user", "a1"))
-        s1.add_message(ChatMessage("user", "a2"))
-        s2.add_message(ChatMessage("user", "b1"))
+        sm.add_message(s1.id, ChatMessage("user", "a1"))
+        sm.add_message(s1.id, ChatMessage("user", "a2"))
+        sm.add_message(s2.id, ChatMessage("user", "b1"))
 
         assert s1.message_count == 2
         assert s2.message_count == 1
@@ -172,7 +175,7 @@ class TestSessionIsolation:
         """get_context_messages must not expose internal list for mutation."""
         s = Session(id="s1", name="Test", endpoint_url="http://ep", model="model")
         sm.sessions["s1"] = s
-        s.add_message(ChatMessage("user", "original"))
+        sm.add_message(s.id, ChatMessage("user", "original"))
 
         ctx = s.get_context_messages()
         ctx.append({"role": "user", "content": "injected"})
@@ -187,7 +190,7 @@ class TestSessionIsolation:
         """get_session returns the session from cache."""
         s = Session(id="s1", name="Test", endpoint_url="http://ep", model="model")
         sm.sessions["s1"] = s
-        s.add_message(ChatMessage("user", "hi"))
+        sm.add_message(s.id, ChatMessage("user", "hi"))
 
         retrieved = sm.get_session("s1")
         assert len(retrieved.history) == 1

@@ -767,7 +767,7 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
         )
 
         from core.models import ChatMessage
-        new_sess.add_message(ChatMessage(
+        session_manager.add_message(new_sess.id, ChatMessage(
             role="system",
             content=primer,
             metadata={"research_spinoff_from": session_id},
