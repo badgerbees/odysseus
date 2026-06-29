@@ -86,6 +86,11 @@ _ROUTING_PATTERNS: tuple[tuple[str, str, Pattern[str]], ...] = tuple(
         ("email", "check inbox request", r"\bcheck\s+(?:my\s+)?(?:email|inbox|mail)\b"),
         ("email", "unread email request", r"\bunread\s+(?:email|mail)s?\b"),
 
+        # Contacts / Address Book.
+        ("contacts", "contact info question", r"\b(?:what(?:'s| is)|mi\s+dici)\b.{0,120}\b(?:the\s+|il\s+)?(?:phone\s+)?(?:number|numero|email|address|contact)\b.{0,40}\b(?:of|for|di)\b"),
+        ("contacts", "contact info imperative", rf"{_PLEASE}(?:find|get|look\s+up|give\s+me|tell\s+me)\b.{{0,120}}\b(?:the\s+|il\s+)?(?:phone\s+)?(?:number|numero|email|address|contact)\b.{{0,40}}\b(?:of|for|di)\b"),
+        ("contacts", "assistant contact lookup request", rf"{_ACTION_QUESTION}(?:find|get|look\s+up|give\s+me|tell\s+me)\b.{{0,120}}\b(?:the\s+|il\s+)?(?:phone\s+)?(?:number|numero|email|address|contact)\b.{{0,40}}\b(?:of|for|di)\b"),
+
         # UI/control-plane actions that should open panels or flip toggles.
         ("ui", "open/show panel request", rf"{_PLEASE}(?:open|show|bring\s+up)\s+(?:me\s+)?(?:my\s+|the\s+)?{_PANEL}\b"),
         ("ui", "tool or feature toggle request", r"\b(?:disable|enable|turn\s+(?:on|off))\s+(?:the\s+)?(?:shell|search|web|browser|documents?|memory|skills|images?|calendar|email|mail|research|incognito)\b"),
