@@ -127,6 +127,10 @@ DEFAULT_SETTINGS = {
     # `compute_input_token_budget`.
     "agent_input_token_hard_max": 200_000,
     "agent_stream_timeout_seconds": 300,
+    # Hard wall-clock cap on a single LLM stream response (seconds).
+    # Used to catch runaway streams that trickle bytes forever.
+    # Defaults to 1200 (20 minutes). Can be increased for slow hardware.
+    "agent_stream_wall_clock_timeout_seconds": 1200,
     # Extra directory roots that read_file / write_file may access, in
     # addition to the built-in project data/ and system temp dirs. Each
     # entry is an absolute path. Sensitive subpaths (.ssh, .gnupg, shell

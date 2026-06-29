@@ -2657,11 +2657,12 @@ async def stream_agent_loop(
         # only switches on a pre-content failure, so streamed output is never
         # duplicated; the dead-host cooldown keeps repeat primary attempts cheap.
         _candidates = [(endpoint_url, model, headers)] + list(fallbacks or [])
+        agent_stream_wall_clock = int(get_setting("agent_stream_wall_clock_timeout_seconds", 1200) or 1200)
         # stream_llm enforces a per-read INACTIVITY timeout (httpx read=timeout),
         # which kills a wedged/silent endpoint. This wall-clock deadline is the
         # complementary cap for the rare stream that trickles bytes forever and
         # so never trips the inactivity timeout. Generous — only catches runaway.
-        _round_deadline = time.time() + max(agent_stream_timeout * 4, 1200)
+        _round_deadline = time.time() + max(agent_stream_timeout * 4, agent_stream_wall_clock)
         _round_start = time.time()
         _round_first_event_logged = False
         _round_first_token_logged = False
@@ -2698,7 +2699,7 @@ async def stream_agent_loop(
                     "[agent-timing] round_deadline round=%s elapsed=%.3fs deadline_s=%s",
                     round_num,
                     time.time() - _round_start,
-                    max(agent_stream_timeout * 4, 1200),
+                    max(agent_stream_timeout * 10, 21600),
                 )
                 break
             # Forward error events from stream_llm to the frontend
