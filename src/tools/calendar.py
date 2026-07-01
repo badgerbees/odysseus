@@ -214,7 +214,7 @@ async def do_manage_calendar(content: str, owner: Optional[str] = None) -> Dict:
                     "end", "end_time", "end_date", "range_end", "to", "dtend", "until"
                 )
                 query_raw = args.get("query") or args.get("date_range") or args.get("range")
-                if query_raw and not start_raw and not end_raw:
+                if query_raw and (not start_raw or not end_raw):
                     return {
                         "error": (
                             "list_events needs explicit start/end ISO datetimes; "
