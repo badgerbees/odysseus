@@ -37,7 +37,17 @@ class _FakeSessionManager:
     def create_session(self, session_id=None, name=None, endpoint_url=None,
                        model=None, rag=False, owner=None):
         self.created = _FakeSession(name=name, owner=owner)
+        self.created.id = session_id
         return self.created
+
+    def get_session(self, session_id):
+        return self.sessions[session_id]
+
+    def add_message(self, session_id, message):
+        if session_id in self.sessions:
+            self.sessions[session_id].history.append(message)
+        elif self.created and self.created.id == session_id:
+            self.created.history.append(message)
 
     def save_sessions(self):
         pass

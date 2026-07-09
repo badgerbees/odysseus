@@ -192,6 +192,7 @@ class _SessionManager:
 
     def create_session(self, *, session_id, name, endpoint_url, model, owner):
         session = _ChatSession(endpoint_url, model)
+        session.id = session_id
         self.created.append({
             "session_id": session_id,
             "name": name,
@@ -201,6 +202,15 @@ class _SessionManager:
             "session": session,
         })
         return session
+
+    def get_session(self, session_id):
+        for c in self.created:
+            if c["session_id"] == session_id:
+                return c["session"]
+        raise KeyError(session_id)
+
+    def add_message(self, session_id, message):
+        self.get_session(session_id).history.append(message)
 
     def save_sessions(self):
         self.save_calls += 1

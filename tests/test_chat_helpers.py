@@ -341,9 +341,13 @@ def test_clean_thinking_for_save_extracts_thought_tag():
 def test_save_assistant_response_preserves_actual_and_requested_model():
     sess = _FakeSession("selected-model")
 
+    class _DummyManager:
+        def add_message(self, sid, msg):
+            sess.history.append(msg)
+            
     save_assistant_response(
         sess,
-        session_manager=None,
+        session_manager=_DummyManager(),
         session_id="s1",
         full_response="hello",
         last_metrics={"model": "actual-model", "input_tokens": 1, "output_tokens": 2},

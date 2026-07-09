@@ -475,7 +475,11 @@ def test_spinoff_uses_single_disk_lookup_for_completed_result(tmp_path, monkeypa
 
         def create_session(self, **kwargs):
             self.created = FakeSession()
+            self.created.id = kwargs.get("session_id")
             return self.created
+
+        def add_message(self, session_id, message):
+            self.created.messages.append(message)
 
         def save_sessions(self):
             pass
@@ -536,7 +540,11 @@ def test_spinoff_reads_saved_query_for_done_active_task(tmp_path, monkeypatch):
 
         def create_session(self, **kwargs):
             self.created = FakeSession()
+            self.created.id = kwargs.get("session_id")
             return self.created
+
+        def add_message(self, session_id, message):
+            self.created.messages.append(message)
 
         def save_sessions(self):
             pass

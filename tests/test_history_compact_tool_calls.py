@@ -61,6 +61,9 @@ class _FakeSessionManager:
             raise KeyError(session_id)
         return self.session
 
+    def add_message(self, session_id, message):
+        self.get_session(session_id).history.append(message)
+
     def save_sessions(self):
         self.saved = True
 
