@@ -38,7 +38,6 @@ def _neutralize_collaborators(monkeypatch):
         "ResearchHandler", "ChatHandler", "ModelDiscovery",
     ]:
         monkeypatch.setattr(app_init, name, lambda *a, **k: MagicMock())
-    monkeypatch.setattr(app_init, "set_session_manager", lambda *a, **k: None)
     monkeypatch.setattr(app_init, "update_search_config", lambda *a, **k: None)
     monkeypatch.setattr(app_init, "create_directories", lambda: None)
 

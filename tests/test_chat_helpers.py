@@ -340,6 +340,7 @@ def test_clean_thinking_for_save_extracts_thought_tag():
 
 def test_save_assistant_response_preserves_actual_and_requested_model():
     sess = _FakeSession("selected-model")
+    sess.id = "s1"
 
     class _DummyManager:
         def add_message(self, sid, msg):

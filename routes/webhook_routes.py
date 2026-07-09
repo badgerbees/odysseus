@@ -246,6 +246,7 @@ def setup_webhook_routes(
         from core.models import ChatMessage
         from src.llm_core import llm_call_async
         from src.endpoint_resolver import build_chat_url, build_headers, build_models_url, normalize_base
+        from routes.chat_helpers import build_chat_context
 
         message = body.message.strip()
         if not message:
