@@ -246,7 +246,6 @@ def setup_webhook_routes(
         from core.models import ChatMessage
         from src.llm_core import llm_call_async
         from src.endpoint_resolver import build_chat_url, build_headers, build_models_url, normalize_base
-        from routes.chat_helpers import build_chat_context
 
         message = body.message.strip()
         if not message:
@@ -378,11 +377,7 @@ def setup_webhook_routes(
         session_manager.add_message(sess.id, ChatMessage("user", message))
 
         messages = [{"role": m.role, "content": m.content} for m in sess.history]
-        context = await build_chat_context(
-            sess, request, chat_handler, chat_processor, message=message, session_id=session_id
-        )
-
-        reply, _, _ = await llm_call_async("chat", messages, context=context)
+        reply = await llm_call_async(sess.endpoint_url, sess.model, messages, headers=sess.headers)
         session_manager.add_message(sess.id, ChatMessage("assistant", reply))
         session_manager.save_sessions()
 

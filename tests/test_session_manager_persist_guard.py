@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from core.models import ChatMessage
 from core.session_manager import SessionManager
@@ -21,6 +21,9 @@ def _session_local(parent_row):
 def test_persist_message_drops_write_when_parent_session_is_gone(monkeypatch):
     session_local, db = _session_local(None)
     monkeypatch.setattr(SM, "SessionLocal", session_local)
+    # Prevent real SQLAlchemy model classes from interfering with mock filter chain
+    monkeypatch.setattr(SM, "DbSession", MagicMock())
+    monkeypatch.setattr(SM, "DbChatMessage", MagicMock())
 
     manager = _manager_with({"deleted": SimpleNamespace(history=[])})
     message = ChatMessage("assistant", "late token")
@@ -37,16 +40,21 @@ def test_persist_message_still_writes_when_parent_session_exists(monkeypatch):
     parent = SimpleNamespace(message_count=0, last_accessed=None, last_message_at=None)
     session_local, db = _session_local(parent)
     monkeypatch.setattr(SM, "SessionLocal", session_local)
+    # Prevent real SQLAlchemy model classes from interfering with mock filter chain
+    monkeypatch.setattr(SM, "DbSession", MagicMock())
+    fake_msg = MagicMock()
+    monkeypatch.setattr(SM, "DbChatMessage", MagicMock(return_value=fake_msg))
 
     message = ChatMessage("user", "hello")
     manager = _manager_with({"sid": SimpleNamespace(history=[message])})
 
     manager._persist_message("sid", message)
 
-    db.add.assert_called_once()
+    db.add.assert_called_once_with(fake_msg)
     db.commit.assert_called_once()
     assert parent.message_count == 1
     assert parent.last_accessed is not None
     assert parent.last_message_at is not None
     assert message.metadata["_db_id"]
     assert message.metadata["timestamp"].endswith("Z")
+
