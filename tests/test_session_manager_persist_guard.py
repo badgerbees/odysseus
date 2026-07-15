@@ -72,9 +72,18 @@ class _ExistingParentDB(_FakeDB):
 # Tests
 # ---------------------------------------------------------------------------
 
+def _re_raise_logger_error(*args, **kwargs):
+    import sys
+    _, exc, _ = sys.exc_info()
+    if exc:
+        raise exc
+    raise RuntimeError(f"Logger error called: {args}")
+
+
 def test_persist_message_drops_write_when_parent_session_is_gone(monkeypatch):
     db = _MissingParentDB()
     monkeypatch.setattr(SM, "SessionLocal", lambda: db)
+    monkeypatch.setattr(SM.logger, "error", _re_raise_logger_error)
 
     manager = _manager_with({"deleted": SimpleNamespace(history=[])})
     message = ChatMessage("assistant", "late token")
@@ -91,6 +100,7 @@ def test_persist_message_still_writes_when_parent_session_exists(monkeypatch):
     parent = SimpleNamespace(message_count=0, last_accessed=None, last_message_at=None)
     db = _ExistingParentDB(parent)
     monkeypatch.setattr(SM, "SessionLocal", lambda: db)
+    monkeypatch.setattr(SM.logger, "error", _re_raise_logger_error)
 
     message = ChatMessage("user", "hello")
     manager = _manager_with({"sid": SimpleNamespace(history=[message])})
