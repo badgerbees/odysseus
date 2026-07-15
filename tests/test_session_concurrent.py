@@ -13,7 +13,11 @@ import pytest
 
 from core.models import Session, ChatMessage
 from core.session_manager import SessionManager
-SessionManager._persist_message = lambda self, session_id, message: None
+
+
+@pytest.fixture(autouse=True)
+def _stub_persist_message(monkeypatch):
+    monkeypatch.setattr(SessionManager, "_persist_message", lambda self, session_id, message: None)
 
 
 @pytest.mark.asyncio
